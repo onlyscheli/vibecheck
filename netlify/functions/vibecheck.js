@@ -1,23 +1,14 @@
 
 exports.handler = async function (event) {
-    const allowedOrigins = [
-        "https://onlyscheli.github.io",
-        "https://onlyscheli.com",
-        "https://www.onlysheli.com"
-    ];
-
-    const origin = event.headers?.origin || "";
-
+    // CORS: Anfragen von GitHub Pages und anderen Seiten testweise erlauben
     const headers = {
-        "Access-Control-Allow-Origin": allowedOrigins.includes(origin)
-            ? origin
-            : "https://onlyscheli.github.io",
+        "Access-Control-Allow-Origin": "*",
         "Access-Control-Allow-Methods": "POST, OPTIONS",
         "Access-Control-Allow-Headers": "Content-Type",
-        "Content-Type": "application/json",
-        "Vary": "Origin"
+        "Content-Type": "application/json"
     };
 
+    // Browser prüft zuerst, ob die Anfrage erlaubt ist
     if (event.httpMethod === "OPTIONS") {
         return {
             statusCode: 204,
@@ -26,6 +17,7 @@ exports.handler = async function (event) {
         };
     }
 
+    // Nur POST-Anfragen erlauben
     if (event.httpMethod !== "POST") {
         return {
             statusCode: 405,
@@ -37,6 +29,7 @@ exports.handler = async function (event) {
     }
 
     try {
+        // Daten aus dem Frontend lesen
         const body = JSON.parse(event.body || "{}");
 
         const {
@@ -47,6 +40,7 @@ exports.handler = async function (event) {
             verfassungLabel
         } = body;
 
+        // Prüfen, ob die Pflichtfelder vorhanden sind
         if (!vorname || !sternzeichen || !generation) {
             return {
                 statusCode: 400,
@@ -57,6 +51,7 @@ exports.handler = async function (event) {
             };
         }
 
+        // OpenAI API-Schlüssel aus Netlify laden
         const apiKey = process.env.OPENAI_API_KEY;
 
         if (!apiKey) {
@@ -69,17 +64,21 @@ exports.handler = async function (event) {
             };
         }
 
+        // Prompt für den VibeCheck erstellen
         const prompt = `Erstelle einen Vibecheck für ${vorname}.
+
 Sternzeichen: ${sternzeichen}.
-Tagesverfassung Stufe (1=fröhlich, 5=genervt): ${verfassungVal} (${verfassungLabel}).
+Tagesverfassung Stufe (1=fröhlich, 5=genervt): ${verfassungVal} (${verfassungLabel || ""}).
 Generation: ${generation}.
 
 Anforderungen:
 - Genau 2 Absätze.
 - Absatz 1: Humorvoller Roast, maximal 2 Sätze.
 - Absatz 2: Motivierende positive Vibes, maximal 2 Sätze.
-- Keine Einleitung und keine Überschriften.`;
+- Keine Einleitung und keine Überschriften.
+- Schreibe auf Deutsch.`;
 
+        // Anfrage an OpenAI senden
         const response = await fetch(
             "https://api.openai.com/v1/chat/completions",
             {
@@ -103,8 +102,9 @@ Anforderungen:
 
         const data = await response.json();
 
+        // Fehler von OpenAI weitergeben
         if (!response.ok || data.error) {
-            console.error("OpenAI API Fehler:", data.error);
+            console.error("OpenAI-Fehler:", data.error);
 
             return {
                 statusCode: 502,
@@ -115,16 +115,20 @@ Anforderungen:
             };
         }
 
+        // Ergebnis zurück ans Frontend senden
+        const result =
+            data.choices?.[0]?.message?.content?.trim() || "";
+
         return {
             statusCode: 200,
             headers,
             body: JSON.stringify({
-                result: data.choices?.[0]?.message?.content?.trim() || ""
+                result: result
             })
         };
 
     } catch (error) {
-        console.error("Vibecheck Function Fehler:", error);
+        console.error("VibeCheck-Fehler:", error);
 
         return {
             statusCode: 500,
