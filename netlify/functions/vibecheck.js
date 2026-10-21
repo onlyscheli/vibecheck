@@ -1,30 +1,20 @@
 exports.handler = async function (event, context) {
-    // CORS-Header für alle Anfragen definieren
     const headers = {
         "Access-Control-Allow-Origin": "*",
         "Access-Control-Allow-Headers": "Content-Type",
         "Access-Control-Allow-Methods": "POST, OPTIONS"
     };
 
-    // Preflight-Anfrage vom Browser beantworten
     if (event.httpMethod === "OPTIONS") {
-        return {
-            statusCode: 200,
-            headers,
-            body: "OK"
-        };
+        return { statusCode: 200, headers, body: "OK" };
     }
 
     if (event.httpMethod !== "POST") {
-        return { 
-            statusCode: 405, 
-            headers,
-            body: "Method Not Allowed" 
-        };
+        return { statusCode: 405, headers, body: "Method Not Allowed" };
     }
 
     try {
-        const body = JSON.parse(event.body);
+        const body = JSON.parse(event.body || "{}");
         const { vorname, sternzeichen, verfassungVal, generation, verfassungLabel } = body;
 
         const apiKey = process.env.OPENAI_API_KEY;
@@ -33,7 +23,7 @@ exports.handler = async function (event, context) {
             return {
                 statusCode: 500,
                 headers,
-                body: JSON.stringify({ error: "API Key fehlt auf dem Server!" })
+                body: JSON.stringify({ error: "Fehler: Der OPENAI_API_KEY ist in Netlify nicht hinterlegt!" })
             };
         }
 
@@ -52,7 +42,7 @@ Anforderungen:
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
-                "Authorization": `Bearer ${apiKey}`
+                "Authorization": `Bearer ${apiKey.trim()}`
             },
             body: JSON.stringify({
                 model: "gpt-4o-mini",
@@ -63,11 +53,12 @@ Anforderungen:
 
         const data = await response.json();
 
-        if (data.error) {
+        if (!response.ok || data.error) {
+            const msg = data.error ? data.error.message : "OpenAI Fehler";
             return {
-                statusCode: 400,
+                statusCode: response.status,
                 headers,
-                body: JSON.stringify({ error: data.error.message })
+                body: JSON.stringify({ error: `OpenAI meldet: ${msg}` })
             };
         }
 
@@ -81,7 +72,7 @@ Anforderungen:
         return {
             statusCode: 500,
             headers,
-            body: JSON.stringify({ error: err.message })
+            body: JSON.stringify({ error: `Server-Fehler: ${err.message}` })
         };
     }
 };
