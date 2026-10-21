@@ -1,7 +1,26 @@
 exports.handler = async function (event, context) {
-    // Nur POST-Anfragen erlauben
+    // CORS-Header für alle Anfragen definieren
+    const headers = {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Headers": "Content-Type",
+        "Access-Control-Allow-Methods": "POST, OPTIONS"
+    };
+
+    // Preflight-Anfrage vom Browser beantworten
+    if (event.httpMethod === "OPTIONS") {
+        return {
+            statusCode: 200,
+            headers,
+            body: "OK"
+        };
+    }
+
     if (event.httpMethod !== "POST") {
-        return { statusCode: 405, body: "Method Not Allowed" };
+        return { 
+            statusCode: 405, 
+            headers,
+            body: "Method Not Allowed" 
+        };
     }
 
     try {
@@ -13,6 +32,7 @@ exports.handler = async function (event, context) {
         if (!apiKey) {
             return {
                 statusCode: 500,
+                headers,
                 body: JSON.stringify({ error: "API Key fehlt auf dem Server!" })
             };
         }
@@ -46,19 +66,21 @@ Anforderungen:
         if (data.error) {
             return {
                 statusCode: 400,
+                headers,
                 body: JSON.stringify({ error: data.error.message })
             };
         }
 
         return {
             statusCode: 200,
-            headers: { "Content-Type": "application/json" },
+            headers,
             body: JSON.stringify({ result: data.choices[0].message.content.trim() })
         };
 
     } catch (err) {
         return {
             statusCode: 500,
+            headers,
             body: JSON.stringify({ error: err.message })
         };
     }
