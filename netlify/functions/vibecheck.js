@@ -1,16 +1,26 @@
 exports.handler = async function (event, context) {
+    // Erlaubt explizit deine eigene Domain und alle Verbindungen
     const headers = {
         "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Headers": "Content-Type",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization",
         "Access-Control-Allow-Methods": "POST, OPTIONS"
     };
 
+    // Preflight-Anfrage des Browsers direkt positiv beantworten
     if (event.httpMethod === "OPTIONS") {
-        return { statusCode: 200, headers, body: "OK" };
+        return {
+            statusCode: 200,
+            headers,
+            body: "OK"
+        };
     }
 
     if (event.httpMethod !== "POST") {
-        return { statusCode: 405, headers, body: "Method Not Allowed" };
+        return { 
+            statusCode: 405, 
+            headers,
+            body: "Method Not Allowed" 
+        };
     }
 
     try {
@@ -23,7 +33,7 @@ exports.handler = async function (event, context) {
             return {
                 statusCode: 500,
                 headers,
-                body: JSON.stringify({ error: "Fehler: Der OPENAI_API_KEY ist in Netlify nicht hinterlegt!" })
+                body: JSON.stringify({ error: "API-Key ist auf dem Server (Netlify) nicht konfiguriert!" })
             };
         }
 
@@ -54,11 +64,10 @@ Anforderungen:
         const data = await response.json();
 
         if (!response.ok || data.error) {
-            const msg = data.error ? data.error.message : "OpenAI Fehler";
             return {
-                statusCode: response.status,
+                statusCode: response.status || 400,
                 headers,
-                body: JSON.stringify({ error: `OpenAI meldet: ${msg}` })
+                body: JSON.stringify({ error: data.error ? data.error.message : "Fehler bei OpenAI" })
             };
         }
 
@@ -72,7 +81,7 @@ Anforderungen:
         return {
             statusCode: 500,
             headers,
-            body: JSON.stringify({ error: `Server-Fehler: ${err.message}` })
+            body: JSON.stringify({ error: "Server-Fehler: " + err.message })
         };
     }
 };
